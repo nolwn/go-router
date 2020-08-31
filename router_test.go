@@ -27,6 +27,16 @@ func TestAddRouter(t *testing.T) {
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
+
+	checkLookup(r.lookup)
+}
+
+func checkLookup(curr *segment) {
+	fmt.Printf("%p { path: %s, methods: %v, children: %v, callback: %p }\n", curr, curr.path, curr.methods, curr.children, curr.callback)
+
+	for _, v := range curr.children {
+		checkLookup(v)
+	}
 }
 
 func addAndCheckRoute(r *Router, method string, path string, callback http.HandlerFunc, routeCounter *int) (err error) {
