@@ -8,28 +8,45 @@ import (
 
 func TestAddRouter(t *testing.T) {
 	r := Router{}
+	routeCounter := 0
 
-	err := addAndCheckRoute(r, http.MethodGet, "/", func(http.ResponseWriter, *http.Request) {}, 0)
+	err := addAndCheckRoute(&r, http.MethodGet, "/", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+
+	if err != nil {
+		t.Error("The route was not correctly added to the router: ", err)
+	}
+
+	err = addAndCheckRoute(&r, http.MethodPost, "/", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+
+	if err != nil {
+		t.Error("The route was not correctly added to the router: ", err)
+	}
+
+	err = addAndCheckRoute(&r, http.MethodPatch, "/items", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
 
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
 }
 
-func addAndCheckRoute(r Router, method string, path string, callback http.HandlerFunc, expectedIndex int) (err error) {
+func addAndCheckRoute(r *Router, method string, path string, callback http.HandlerFunc, routeCounter *int) (err error) {
 	err = r.AddRoute(method, path, callback)
+
+	defer func(routeCounter *int) {
+		*routeCounter++
+	}(routeCounter)
 
 	if err != nil {
 		return
 	}
 
-	if len(r.routes) != expectedIndex+1 {
-		err = fmt.Errorf("Expected there to be %d route(s), but there are %d", expectedIndex+1, len(r.routes))
+	if len(r.routes) != *routeCounter+1 {
+		err = fmt.Errorf("Expected there to be %d route(s), but there are %d", *routeCounter+1, len(r.routes))
 
 		return
 	}
 
-	route := r.routes[expectedIndex]
+	route := r.routes[*routeCounter]
 
 	if route.method != method {
 		err = fmt.Errorf("Expected the route method to be %s, but it was %s", method, route.method)
