@@ -18,7 +18,17 @@ type segment struct {
 	children map[string]*segment
 }
 
-// Router is the main router object that keeps track of an looks up routes.
+// Router is a replacement for the net/http DefaultServerMux. This version includes the
+// ability to add path parameter in the given path.
+//
+// Paths are registered relative to their base path, WITHOUT a hostname, something that
+// is allowed in the DefaultServerMux but is not allowed in this one. Each callback needs
+// to be given a unique combination of method and path.
+//
+// Path parameters can be registered by prefacing any section of the path with a ":", so
+// "/items/:itemid" would register ":itemid" as a wildcard which will be turned into  a path
+// parameter called "itemid". A request path with "/items/" followed by a string of legal http
+// characters, not including a slash, would match this path.
 type Router struct {
 	routes []route
 	lookup *segment
@@ -29,7 +39,8 @@ func NewRouter() (r Router) {
 	return
 }
 
-// AddRoute adds a new route with a corresponding callback to the router.
+// AddRoute registers a new handler function to a path and http.HandlerFunc. If a path and
+// method already have a callback registered to them, and error is returned.
 func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc) (err error) {
 	keys := setupKeys(strings.Split(path, "/"))
 	if r.lookup == nil {
@@ -64,6 +75,49 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 	if err == nil {
 		curr.methods[method] = callback
 		r.routes = append(r.routes, route{method, path, callback})
+	}
+
+	return
+}
+
+// Handler returns the handler to use for the given request,
+// consulting r.Method, r.URL.Path. It always returns
+// a non-nil handler.
+//
+// Handler also returns the registered pattern that matches the
+// request.
+//
+// If there is no registered handler that applies to the request,
+// Handler returns a ``page not found'' handler and an empty pattern.
+func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
+	method := req.Method
+	path := req.URL.Path
+	root := r.lookup
+	curr := root
+
+	segments := strings.Split(path, "/")
+	keys := setupKeys(segments)
+
+	// TODO: make this a named function somewhere. Maybe allow a custom version.
+	h = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	})
+
+	for _, v := range keys {
+		if v == "/" {
+			continue
+		}
+
+		if seg, ok := curr.children[v]; ok {
+			curr = seg
+		} else {
+			return
+		}
+	}
+
+	if cb, ok := curr.methods[method]; ok {
+		h = cb
+		pattern = curr.path
 	}
 
 	return

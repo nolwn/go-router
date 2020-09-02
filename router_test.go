@@ -2,45 +2,87 @@ package router
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
 func TestAddRouter(t *testing.T) {
-	r := Router{}
+	router := Router{}
 	routeCounter := 0
 
-	err := addAndCheckRoute(&r, http.MethodGet, "/", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+	err := addAndCheckRoute(&router, http.MethodGet, "/", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
 
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
 
-	err = addAndCheckRoute(&r, http.MethodPost, "/", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+	err = addAndCheckRoute(&router, http.MethodPost, "/", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
 
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
 
-	err = addAndCheckRoute(&r, http.MethodPatch, "/items", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+	err = addAndCheckRoute(&router, http.MethodPatch, "/items", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
 
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
 
-	err = addAndCheckRoute(&r, http.MethodDelete, "/items/thing/man/bird/horse/poop", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+	err = addAndCheckRoute(&router, http.MethodDelete, "/items/thing/man/bird/horse/poop", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
 
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
 
-	err = addAndCheckRoute(&r, http.MethodDelete, "/items/thing/man/bird/cat/poop", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+	err = addAndCheckRoute(&router, http.MethodDelete, "/items/thing/man/bird/cat/poop", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
 
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
 
-	checkLookup(r.lookup)
+	// checkLookup(router.lookup)
+}
+
+func TestHandler(t *testing.T) {
+	router := Router{}
+	request, err := http.NewRequest(http.MethodGet, "http://example.com/items", nil)
+	rr := httptest.NewRecorder()
+	expectedBody := "I am /items"
+
+	if err != nil {
+		t.Error("Could not create request")
+	}
+
+	router.AddRoute(http.MethodGet, "/items", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(expectedBody))
+	})
+
+	checkLookup(router.lookup)
+
+	h, pattern := router.Handler(request)
+
+	if pattern != "/items" {
+		t.Errorf("The recovered patter does not match: %s", pattern)
+	}
+
+	h.ServeHTTP(rr, request)
+
+	if rr.Code != 200 {
+		t.Errorf("The returned callback did not write 200 to the header. Found %d", rr.Code)
+	}
+
+	body, _ := ioutil.ReadAll(rr.Body)
+
+	if string(body) != string([]byte(expectedBody)) {
+		t.Errorf(
+			"The returned callback did not write the expected body. Expected: %s. Actual: %s",
+			expectedBody,
+			string(body),
+		)
+	}
 }
 
 func checkLookup(curr *segment) {
