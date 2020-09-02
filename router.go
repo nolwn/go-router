@@ -2,7 +2,6 @@ package router
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 )
@@ -15,8 +14,7 @@ type route struct {
 
 type segment struct {
 	path     string
-	methods  map[string]bool
-	callback http.HandlerFunc
+	methods  map[string]http.HandlerFunc
 	children map[string]*segment
 }
 
@@ -37,15 +35,19 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 	if r.lookup == nil {
 		r.lookup = &segment{}
 		r.lookup.children = map[string]*segment{}
-		r.lookup.methods = map[string]bool{}
+		r.lookup.methods = map[string]http.HandlerFunc{}
+		r.lookup.path = "/"
 	}
 
 	curr := r.lookup
 
-	fmt.Printf("Keys: %v", len(keys))
+	for i, key := range keys {
+		if i == 0 {
+			continue
+		}
 
-	for _, key := range keys {
 		var seg segment
+
 		if child, ok := curr.children[key]; !ok {
 			seg = *newSegment(curr.path, key)
 			curr.children[key] = &seg
@@ -55,13 +57,12 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 		}
 	}
 
-	if curr.methods[method] {
+	if _, ok := curr.methods[method]; ok {
 		err = errors.New("path already exists")
 	}
 
 	if err == nil {
-		curr.callback = callback
-		curr.methods[method] = true
+		curr.methods[method] = callback
 		r.routes = append(r.routes, route{method, path, callback})
 	}
 
@@ -111,7 +112,7 @@ func newSegment(parentPath string, key string) (seg *segment) {
 	}
 	seg = &segment{}
 	seg.children = map[string]*segment{}
-	seg.methods = map[string]bool{}
+	seg.methods = map[string]http.HandlerFunc{}
 	seg.path = path
 
 	return

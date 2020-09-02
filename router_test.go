@@ -28,11 +28,23 @@ func TestAddRouter(t *testing.T) {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
 
+	err = addAndCheckRoute(&r, http.MethodDelete, "/items/thing/man/bird/horse/poop", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+
+	if err != nil {
+		t.Error("The route was not correctly added to the router: ", err)
+	}
+
+	err = addAndCheckRoute(&r, http.MethodDelete, "/items/thing/man/bird/cat/poop", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
+
+	if err != nil {
+		t.Error("The route was not correctly added to the router: ", err)
+	}
+
 	checkLookup(r.lookup)
 }
 
 func checkLookup(curr *segment) {
-	fmt.Printf("%p { path: %s, methods: %v, children: %v, callback: %p }\n", curr, curr.path, curr.methods, curr.children, curr.callback)
+	fmt.Printf("%p { path: %s, methods: %v, children: %v}\n", curr, curr.path, curr.methods, curr.children)
 
 	for _, v := range curr.children {
 		checkLookup(v)
