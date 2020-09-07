@@ -32,12 +32,16 @@ type segment struct {
 type Router struct {
 	routes []route
 	lookup *segment
+
+	NotFoundHandler http.Handler
 }
 
-// NewRouter is a constructor for Router.
-func NewRouter() (r Router) {
-	return
-}
+// NotFoundHandler is the default function for handling routes that are not found. If you wish to
+// provide your own handler for this, simply set it on the router.
+var NotFoundHandler http.Handler = http.HandlerFunc(
+	func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	})
 
 // AddRoute registers a new handler function to a path and http.HandlerFunc. If a path and
 // method already have a callback registered to them, and error is returned.
@@ -57,12 +61,10 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 			continue
 		}
 
-		var seg segment
-
 		if child, ok := curr.children[key]; !ok {
-			seg = *newSegment(curr.path, key)
-			curr.children[key] = &seg
-			curr = &seg
+			seg := newSegment(curr.path, key)
+			curr.children[key] = seg
+			curr = seg
 		} else {
 			curr = child
 		}
@@ -98,10 +100,9 @@ func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
 	segments := strings.Split(path, "/")
 	keys := setupKeys(segments)
 
-	// TODO: make this a named function somewhere. Maybe allow a custom version.
-	h = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(404)
-	})
+	if r.NotFoundHandler == nil {
+		h = NotFoundHandler
+	}
 
 	for _, v := range keys {
 		if v == "/" {

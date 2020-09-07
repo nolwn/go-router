@@ -47,42 +47,23 @@ func TestAddRouter(t *testing.T) {
 
 func TestHandler(t *testing.T) {
 	router := Router{}
-	request, err := http.NewRequest(http.MethodGet, "http://example.com/items", nil)
-	rr := httptest.NewRecorder()
+	path := "/items"
 	expectedBody := "I am /items"
+	expectedCode := 200
 
-	if err != nil {
-		t.Error("Could not create request")
-	}
-
-	router.AddRoute(http.MethodGet, "/items", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
+	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(expectedCode)
 		w.Write([]byte(expectedBody))
 	})
 
+	err := matchAndCheckRoute(&router, http.MethodGet, path, expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not find the expected callback handler", err)
+	}
+
 	checkLookup(router.lookup)
 
-	h, pattern := router.Handler(request)
-
-	if pattern != "/items" {
-		t.Errorf("The recovered patter does not match: %s", pattern)
-	}
-
-	h.ServeHTTP(rr, request)
-
-	if rr.Code != 200 {
-		t.Errorf("The returned callback did not write 200 to the header. Found %d", rr.Code)
-	}
-
-	body, _ := ioutil.ReadAll(rr.Body)
-
-	if string(body) != string([]byte(expectedBody)) {
-		t.Errorf(
-			"The returned callback did not write the expected body. Expected: %s. Actual: %s",
-			expectedBody,
-			string(body),
-		)
-	}
 }
 
 func checkLookup(curr *segment) {
@@ -91,6 +72,47 @@ func checkLookup(curr *segment) {
 	for _, v := range curr.children {
 		checkLookup(v)
 	}
+}
+
+func matchAndCheckRoute(r *Router, method string, path string, expectedBody string, expectedCode int) (err error) {
+	request, err := http.NewRequest(method, path, nil)
+	rr := httptest.NewRecorder()
+
+	if err != nil {
+		err = fmt.Errorf("Could not create request")
+
+		return
+	}
+
+	h, pattern := r.Handler(request)
+
+	if pattern != "/items" {
+		err = fmt.Errorf("The recovered patter does not match: %s", pattern)
+
+		return
+	}
+
+	h.ServeHTTP(rr, request)
+
+	if rr.Code != expectedCode {
+		err = fmt.Errorf("The returned callback did not write 200 to the header. Found %d", rr.Code)
+
+		return
+	}
+
+	body, _ := ioutil.ReadAll(rr.Body)
+
+	if string(body) != string([]byte(expectedBody)) {
+		err = fmt.Errorf(
+			"The returned callback did not write the expected body. Expected: %s. Actual: %s",
+			expectedBody,
+			string(body),
+		)
+
+		return
+	}
+
+	return
 }
 
 func addAndCheckRoute(r *Router, method string, path string, callback http.HandlerFunc, routeCounter *int) (err error) {
@@ -132,12 +154,3 @@ func addAndCheckRoute(r *Router, method string, path string, callback http.Handl
 
 	return
 }
-
-// func TestHandle(t *testing.T) {
-// 	r := NewRouter()
-
-// 	request, _ := http.NewRequest(http.MethodGet, "http://example.domain/api", nil)
-// 	var writer http.ResponseWriter
-
-// r.Handle(writer, request)
-// }
