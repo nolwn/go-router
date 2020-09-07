@@ -109,7 +109,7 @@ func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
 	root := r.lookup
 	curr := root
 
-	fmt.Print("The route handler has been called.")
+	fmt.Printf("The route handler has been called. %s", req.URL.Path)
 
 	segments := strings.Split(path, "/")
 	keys := setupKeys(segments)
