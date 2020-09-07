@@ -45,7 +45,7 @@ func TestAddRouter(t *testing.T) {
 	// checkLookup(router.lookup)
 }
 
-func TestHandler(t *testing.T) {
+func TestServeHTTP(t *testing.T) {
 	router := Router{}
 	path := "/items"
 	expectedBody := "I am /items"
@@ -61,17 +61,6 @@ func TestHandler(t *testing.T) {
 	if err != nil {
 		t.Error("Did not find the expected callback handler", err)
 	}
-
-	checkLookup(router.lookup)
-
-}
-
-func checkLookup(curr *segment) {
-	fmt.Printf("%p { path: %s, methods: %v, children: %v}\n", curr, curr.path, curr.methods, curr.children)
-
-	for _, v := range curr.children {
-		checkLookup(v)
-	}
 }
 
 func matchAndCheckRoute(r *Router, method string, path string, expectedBody string, expectedCode int) (err error) {
@@ -84,15 +73,7 @@ func matchAndCheckRoute(r *Router, method string, path string, expectedBody stri
 		return
 	}
 
-	h, pattern := r.Handler(request)
-
-	if pattern != "/items" {
-		err = fmt.Errorf("The recovered patter does not match: %s", pattern)
-
-		return
-	}
-
-	h.ServeHTTP(rr, request)
+	r.ServeHTTP(rr, request)
 
 	if rr.Code != expectedCode {
 		err = fmt.Errorf("The returned callback did not write 200 to the header. Found %d", rr.Code)
@@ -153,4 +134,13 @@ func addAndCheckRoute(r *Router, method string, path string, callback http.Handl
 	}
 
 	return
+}
+
+// checkLookup prints out the various saved routes. It's not needed for any test, but is a helpful debugging tool.
+func checkLookup(curr *segment) {
+	fmt.Printf("%p { path: %s, methods: %v, children: %v}\n", curr, curr.path, curr.methods, curr.children)
+
+	for _, v := range curr.children {
+		checkLookup(v)
+	}
 }

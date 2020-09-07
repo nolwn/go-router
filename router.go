@@ -154,7 +154,16 @@ func (r *Router) Get(path string, callback http.HandlerFunc) {
 	r.AddRoute(http.MethodGet, path, callback)
 }
 
+// ServeHTTP is the function that is required by http.Handler. It takes an http.ResponseWriter which
+// it uses to write to a response object that will construct a response for the user. It also takes
+// an *http.Request which describes the request the user has made.
+//
+// In the case of this router, all it needs to do is lookup the Handler that has been saved at a given
+// path and then call its ServeHTTP.
 func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	handler, _ := r.Handler(req)
+	handler.ServeHTTP(w, req)
+
 	return
 }
 
