@@ -2,6 +2,7 @@ package router
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -41,6 +42,7 @@ type Router struct {
 var NotFoundHandler http.Handler = http.HandlerFunc(
 	func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
+		w.Write([]byte("Not Found."))
 	})
 
 // AddRoute registers a new handler function to a path and http.HandlerFunc. If a path and
@@ -79,7 +81,17 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 		r.routes = append(r.routes, route{method, path, callback})
 	}
 
+	checkLookup(r.lookup)
+
 	return
+}
+
+func checkLookup(curr *segment) {
+	fmt.Printf("%p { path: %s, methods: %v, children: %v}\n", curr, curr.path, curr.methods, curr.children)
+
+	for _, v := range curr.children {
+		checkLookup(v)
+	}
 }
 
 // Handler returns the handler to use for the given request,
@@ -96,6 +108,8 @@ func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
 	path := req.URL.Path
 	root := r.lookup
 	curr := root
+
+	fmt.Print("The route handler has been called.")
 
 	segments := strings.Split(path, "/")
 	keys := setupKeys(segments)
@@ -161,6 +175,8 @@ func (r *Router) Get(path string, callback http.HandlerFunc) {
 // In the case of this router, all it needs to do is lookup the Handler that has been saved at a given
 // path and then call its ServeHTTP.
 func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	fmt.Print("Router's ServeHTTP method has been called.")
+
 	handler, _ := r.Handler(req)
 	handler.ServeHTTP(w, req)
 

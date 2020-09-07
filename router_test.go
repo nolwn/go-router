@@ -137,10 +137,10 @@ func addAndCheckRoute(r *Router, method string, path string, callback http.Handl
 }
 
 // checkLookup prints out the various saved routes. It's not needed for any test, but is a helpful debugging tool.
-func checkLookup(curr *segment) {
-	fmt.Printf("%p { path: %s, methods: %v, children: %v}\n", curr, curr.path, curr.methods, curr.children)
+// func checkLookup(curr *segment) {
+// 	fmt.Printf("%p { path: %s, methods: %v, children: %v}\n", curr, curr.path, curr.methods, curr.children)
 
-	for _, v := range curr.children {
-		checkLookup(v)
-	}
-}
+// 	for _, v := range curr.children {
+// 		checkLookup(v)
+// 	}
+// }
