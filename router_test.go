@@ -9,6 +9,8 @@ import (
 )
 
 func TestAddRouter(t *testing.T) {
+	defer testOutcome("can add router", t)
+
 	router := Router{}
 	routeCounter := 0
 
@@ -41,11 +43,11 @@ func TestAddRouter(t *testing.T) {
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
 	}
-
-	// checkLookup(router.lookup)
 }
 
 func TestServeHTTP(t *testing.T) {
+	defer testOutcome("can find correct callback function", t)
+
 	router := Router{}
 	path := "/items"
 	expectedBody := "I am /items"
@@ -60,7 +62,10 @@ func TestServeHTTP(t *testing.T) {
 
 	if err != nil {
 		t.Error("Did not find the expected callback handler", err)
+
+		return
 	}
+
 }
 
 func matchAndCheckRoute(r *Router, method string, path string, expectedBody string, expectedCode int) (err error) {
@@ -132,6 +137,20 @@ func addAndCheckRoute(r *Router, method string, path string, callback http.Handl
 
 		return
 	}
+
+	return
+}
+
+func testOutcome(message string, t *testing.T) {
+	var status string
+
+	if t.Failed() {
+		status = "\u001b[31mx\u001b[0m"
+	} else {
+		status = "\u001b[32m✓\u001b[0m"
+	}
+
+	fmt.Printf("%s %s\n", status, message)
 
 	return
 }

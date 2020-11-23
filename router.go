@@ -6,18 +6,6 @@ import (
 	"strings"
 )
 
-type route struct {
-	method   string
-	path     string
-	callback http.HandlerFunc
-}
-
-type segment struct {
-	path     string
-	methods  map[string]http.HandlerFunc
-	children map[string]*segment
-}
-
 // Router is a replacement for the net/http DefaultServerMux. This version includes the
 // ability to add path parameter in the given path.
 //
@@ -31,9 +19,21 @@ type segment struct {
 // characters, not including a slash, would match this path.
 type Router struct {
 	routes []route
-	lookup *segment
+	root   *segment
 
 	NotFoundHandler http.Handler
+}
+
+type route struct {
+	method   string
+	path     string
+	callback http.HandlerFunc
+}
+
+type segment struct {
+	path     string
+	methods  map[string]http.HandlerFunc
+	children map[string]*segment
 }
 
 // NotFoundHandler is the default function for handling routes that are not found. If you wish to
@@ -45,17 +45,18 @@ var NotFoundHandler http.Handler = http.HandlerFunc(
 	})
 
 // AddRoute registers a new handler function to a path and http.HandlerFunc. If a path and
-// method already have a callback registered to them, and error is returned.
+// method already have a callback registered to them, an error is returned.
 func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc) (err error) {
 	keys := setupKeys(strings.Split(path, "/"))
-	if r.lookup == nil {
-		r.lookup = &segment{}
-		r.lookup.children = map[string]*segment{}
-		r.lookup.methods = map[string]http.HandlerFunc{}
-		r.lookup.path = "/"
+
+	if r.root == nil {
+		r.root = &segment{}
+		r.root.children = map[string]*segment{}
+		r.root.methods = map[string]http.HandlerFunc{}
+		r.root.path = "/"
 	}
 
-	curr := r.lookup
+	curr := r.root
 
 	for i, key := range keys {
 		if i == 0 {
@@ -73,29 +74,32 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 
 	if _, ok := curr.methods[method]; ok {
 		err = errors.New("path already exists")
+
+		return
 	}
 
-	if err == nil {
-		curr.methods[method] = callback
-		r.routes = append(r.routes, route{method, path, callback})
-	}
+	curr.methods[method] = callback
+	r.routes = append(r.routes, route{method, path, callback})
 
 	return
 }
 
-// Handler returns the handler to use for the given request,
-// consulting r.Method, r.URL.Path. It always returns
-// a non-nil handler.
+// Get is a convinience method which calls Router.AddRoute with the "GET" method.
+func (r *Router) Get(path string, callback http.HandlerFunc) {
+	r.AddRoute(http.MethodGet, path, callback)
+}
+
+// Handler returns the handler to use for the given request, consulting r.Method, r.URL.Path. It
+// always returns a non-nil handler.
 //
-// Handler also returns the registered pattern that matches the
-// request.
+// Handler also returns the registered pattern that matches the request.
 //
-// If there is no registered handler that applies to the request,
-// Handler returns a ``page not found'' handler and an empty pattern.
+// If there is no registered handler that applies to the request, Handler returns a ``page not
+// found'' handler and an empty pattern.
 func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
 	method := req.Method
 	path := req.URL.Path
-	root := r.lookup
+	root := r.root
 	curr := root
 
 	segments := strings.Split(path, "/")
@@ -125,6 +129,19 @@ func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
 	return
 }
 
+// ServeHTTP is the function that is required by http.Handler. It takes an http.ResponseWriter which
+// it uses to write to a response object that will construct a response for the user. It also takes
+// an *http.Request which describes the request the user has made.
+//
+// In the case of this router, all it needs to do is lookup the Handler that has been saved at a given
+// path and then call its ServeHTTP.
+func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	handler, _ := r.Handler(req)
+	handler.ServeHTTP(w, req)
+
+	return
+}
+
 func addSegment(curr *segment, keys []string) (seg *segment) {
 	for _, key := range keys {
 		if child, ok := curr.children[key]; !ok {
@@ -135,35 +152,6 @@ func addSegment(curr *segment, keys []string) (seg *segment) {
 			curr = child
 		}
 	}
-
-	return
-}
-
-func setupKeys(slice []string) (clean []string) {
-	clean = append(clean, "/")
-	for _, v := range slice {
-		if v != "" {
-			clean = append(clean, "/"+v)
-		}
-	}
-
-	return
-}
-
-// Get is a convinience method which calls Router.AddRoute with the "GET" method.
-func (r *Router) Get(path string, callback http.HandlerFunc) {
-	r.AddRoute(http.MethodGet, path, callback)
-}
-
-// ServeHTTP is the function that is required by http.Handler. It takes an http.ResponseWriter which
-// it uses to write to a response object that will construct a response for the user. It also takes
-// an *http.Request which describes the request the user has made.
-//
-// In the case of this router, all it needs to do is lookup the Handler that has been saved at a given
-// path and then call its ServeHTTP.
-func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	handler, _ := r.Handler(req)
-	handler.ServeHTTP(w, req)
 
 	return
 }
@@ -179,6 +167,17 @@ func newSegment(parentPath string, key string) (seg *segment) {
 	seg.children = map[string]*segment{}
 	seg.methods = map[string]http.HandlerFunc{}
 	seg.path = path
+
+	return
+}
+
+func setupKeys(slice []string) (keys []string) {
+	keys = append(keys, "/")
+	for _, v := range slice {
+		if v != "" {
+			keys = append(keys, "/"+v)
+		}
+	}
 
 	return
 }
