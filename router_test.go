@@ -8,97 +8,83 @@ import (
 	"testing"
 )
 
+var testLevel = 1
+
 func TestAddRouter(t *testing.T) {
-	defer testOutcome("can add router", t)
+	describeTests("Test AddRouter function")
 
 	router := Router{}
-	routeCounter := 0
 
-	err := addAndCheckRoute(&router, http.MethodGet, "/", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
-
-	if err != nil {
-		t.Error("The route was not correctly added to the router: ", err)
-	}
-
-	err = addAndCheckRoute(&router, http.MethodPost, "/", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
-
-	if err != nil {
-		t.Error("The route was not correctly added to the router: ", err)
-	}
-
-	err = addAndCheckRoute(&router, http.MethodPatch, "/items", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
-
-	if err != nil {
-		t.Error("The route was not correctly added to the router: ", err)
-	}
-
-	err = addAndCheckRoute(&router, http.MethodDelete, "/items/thing/man/bird/horse/poop", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
-
-	if err != nil {
-		t.Error("The route was not correctly added to the router: ", err)
-	}
-
-	err = addAndCheckRoute(&router, http.MethodDelete, "/items/thing/man/bird/cat/poop", func(http.ResponseWriter, *http.Request) {}, &routeCounter)
-
-	if err != nil {
-		t.Error("The route was not correctly added to the router: ", err)
-	}
+	testAddRoot(router, t)
+	testAddOneSegment(router, t)
+	testAddManySegments(router, t)
+	// TODO: add test for error when trying duplicate method + path
 }
 
 func TestServeHTTP(t *testing.T) {
-	defer testOutcome("can find correct callback function", t)
+	describeTests("Test ServeHTTP function")
 
 	router := Router{}
-	path := "/items/things/stuff"
-	expectedBody := "I am /items/things/stuff"
-	expectedCode := 200
 
-	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(expectedCode)
-		w.Write([]byte(expectedBody))
-	})
+	testMatchesRoot(router, t)
+	testMatchesLongPath(router, t)
+	testMatchesPathParam(router, t)
+}
 
-	err := matchAndCheckRoute(&router, http.MethodGet, path, expectedBody, expectedCode)
+func addAndCheckRoute(r *Router, method string, path string, callback http.HandlerFunc) (err error) {
+	routeCount := len(r.routes)
+
+	err = r.AddRoute(method, path, callback)
 
 	if err != nil {
-		t.Error("Did not find the expected callback handler", err)
+		return
+	}
+
+	if len(r.routes) != routeCount+1 {
+		err = fmt.Errorf("Expected there to be %d route(s), but there are %d", routeCount+1, len(r.routes))
 
 		return
 	}
 
-	path = "/"
-	expectedBody = "I am /"
+	route := r.routes[len(r.routes)-1]
 
-	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(expectedCode)
-		w.Write([]byte(expectedBody))
-	})
-
-	err = matchAndCheckRoute(&router, http.MethodGet, path, expectedBody, expectedCode)
-
-	if err != nil {
-		t.Error("Did not find the expected callback handler", err)
+	if route.method != method {
+		err = fmt.Errorf("Expected the route method to be %s, but it was %s", method, route.method)
 
 		return
 	}
 
-	path = "/items/:itemid/edit"
-	expectedBody = "I have a path param"
-	reqPath := "/items/this-is-an-id/edit"
-
-	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(expectedCode)
-		w.Write([]byte(expectedBody))
-	})
-
-	err = matchAndCheckRoute(&router, http.MethodGet, reqPath, expectedBody, expectedCode)
-
-	if err != nil {
-		t.Error("Did not find the expected callback handler", err)
+	if route.path != path {
+		err = fmt.Errorf("Expected the route path to be %s, but it was %s", path, route.path)
 
 		return
 	}
 
+	if route.callback == nil {
+		err = fmt.Errorf("Expected route to have a callback function, but the callback was nil")
+
+		return
+	}
+
+	return
+}
+
+// checkLookup prints out the various saved routes. It's not needed for any test, but is a helpful debugging tool.
+func checkLookup(curr *segment) {
+	fmt.Printf("%p { path: \"%s\", methods: %v, children: %v, parameter: %v, parameterName: \"%s\"}\n", curr, curr.path, curr.methods, curr.children, curr.parameter, curr.parameterName)
+
+	for _, v := range curr.children {
+		checkLookup(v)
+	}
+
+	if curr.parameter != nil {
+		checkLookup(curr.parameter)
+	}
+}
+
+func describeTests(message string) {
+	fmt.Printf("%d. %s\n", testLevel, message)
+	testLevel++
 }
 
 func matchAndCheckRoute(r *Router, method string, path string, expectedBody string, expectedCode int) (err error) {
@@ -134,44 +120,110 @@ func matchAndCheckRoute(r *Router, method string, path string, expectedBody stri
 	return
 }
 
-func addAndCheckRoute(r *Router, method string, path string, callback http.HandlerFunc, routeCounter *int) (err error) {
-	err = r.AddRoute(method, path, callback)
+func testAddManySegments(router Router, t *testing.T) {
+	defer testOutcome("add many multiple segments", t)
 
-	defer func(routeCounter *int) {
-		*routeCounter++
-	}(routeCounter)
+	err := addAndCheckRoute(&router, http.MethodDelete, "/items/thing/man/bird/horse/poop", func(http.ResponseWriter, *http.Request) {})
 
 	if err != nil {
-		return
+		t.Error("The route was not correctly added to the router: ", err)
 	}
 
-	if len(r.routes) != *routeCounter+1 {
-		err = fmt.Errorf("Expected there to be %d route(s), but there are %d", *routeCounter+1, len(r.routes))
+	err = addAndCheckRoute(&router, http.MethodDelete, "/items/thing/man/bird/cat/poop", func(http.ResponseWriter, *http.Request) {})
+
+	if err != nil {
+		t.Error("The route was not correctly added to the router: ", err)
+	}
+}
+
+func testAddOneSegment(router Router, t *testing.T) {
+	defer testOutcome("add callbacks to a single segment", t)
+
+	err := addAndCheckRoute(&router, http.MethodPatch, "/items", func(http.ResponseWriter, *http.Request) {})
+
+	if err != nil {
+		t.Error("The route was not correctly added to the router: ", err)
+	}
+}
+
+func testAddRoot(router Router, t *testing.T) {
+	defer testOutcome("add callbacks to root", t)
+
+	err := addAndCheckRoute(&router, http.MethodGet, "/", func(http.ResponseWriter, *http.Request) {})
+
+	if err != nil {
+		t.Error("The route was not correctly added to the router: ", err)
+	}
+
+	err = addAndCheckRoute(&router, http.MethodPost, "/", func(http.ResponseWriter, *http.Request) {})
+
+	if err != nil {
+		t.Error("The route was not correctly added to the router: ", err)
+	}
+}
+
+func testMatchesLongPath(router Router, t *testing.T) {
+	defer testOutcome("match long path", t)
+
+	path := "/items/things/stuff"
+	expectedBody := "I am /items/things/stuff"
+	expectedCode := 200
+
+	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(expectedCode)
+		w.Write([]byte(expectedBody))
+	})
+
+	err := matchAndCheckRoute(&router, http.MethodGet, path, expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not find the expected callback handler", err)
 
 		return
 	}
+}
 
-	route := r.routes[*routeCounter]
+func testMatchesPathParam(router Router, t *testing.T) {
+	defer testOutcome("match path with parameter", t)
 
-	if route.method != method {
-		err = fmt.Errorf("Expected the route method to be %s, but it was %s", method, route.method)
+	expectedBody := "I have a path param"
+	expectedCode := 200
+	path := "/items/:itemid/edit"
+	reqPath := "/items/this-is-an-id/edit"
+
+	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(expectedCode)
+		w.Write([]byte(expectedBody))
+	})
+
+	err := matchAndCheckRoute(&router, http.MethodGet, reqPath, expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not find the expected callback handler", err)
 
 		return
 	}
+}
 
-	if route.path != path {
-		err = fmt.Errorf("Expected the route path to be %s, but it was %s", path, route.path)
+func testMatchesRoot(router Router, t *testing.T) {
+	defer testOutcome("match root path", t)
+
+	expectedBody := "I am /"
+	expectedCode := 200
+	path := "/"
+
+	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(expectedCode)
+		w.Write([]byte(expectedBody))
+	})
+
+	err := matchAndCheckRoute(&router, http.MethodGet, path, expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not find the expected callback handler", err)
 
 		return
 	}
-
-	if route.callback == nil {
-		err = fmt.Errorf("Expected route to have a callback function, but the callback was nil")
-
-		return
-	}
-
-	return
 }
 
 func testOutcome(message string, t *testing.T) {
@@ -183,20 +235,7 @@ func testOutcome(message string, t *testing.T) {
 		status = "\u001b[32m✓\u001b[0m"
 	}
 
-	fmt.Printf("%s %s\n", status, message)
+	fmt.Printf("\t%s %s\n", status, message)
 
 	return
-}
-
-// checkLookup prints out the various saved routes. It's not needed for any test, but is a helpful debugging tool.
-func checkLookup(curr *segment) {
-	fmt.Printf("%p { path: \"%s\", methods: %v, children: %v, parameter: %v, parameterName: \"%s\"}\n", curr, curr.path, curr.methods, curr.children, curr.parameter, curr.parameterName)
-
-	for _, v := range curr.children {
-		checkLookup(v)
-	}
-
-	if curr.parameter != nil {
-		checkLookup(curr.parameter)
-	}
 }
