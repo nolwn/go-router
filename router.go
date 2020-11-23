@@ -18,22 +18,22 @@ import (
 // parameter called "itemid". A request path with "/items/" followed by a string of legal http
 // characters, not including a slash, would match this path.
 type Router struct {
-	routes []route
-	root   *segment
-
 	NotFoundHandler http.Handler
+	root            *segment
+	routes          []route
 }
 
 type route struct {
+	callback http.HandlerFunc
 	method   string
 	path     string
-	callback http.HandlerFunc
 }
 
 type segment struct {
-	path     string
-	methods  map[string]http.HandlerFunc
 	children map[string]*segment
+	methods  map[string]http.HandlerFunc
+	path     string
+	variable string
 }
 
 // NotFoundHandler is the default function for handling routes that are not found. If you wish to
@@ -79,7 +79,7 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 	}
 
 	curr.methods[method] = callback
-	r.routes = append(r.routes, route{method, path, callback})
+	r.routes = append(r.routes, route{callback, method, path})
 
 	return
 }
@@ -158,15 +158,23 @@ func addSegment(curr *segment, keys []string) (seg *segment) {
 
 func newSegment(parentPath string, key string) (seg *segment) {
 	var path string
+
 	if parentPath == "/" {
 		path = key
+
 	} else {
 		path = parentPath + key
 	}
+
 	seg = &segment{}
+
 	seg.children = map[string]*segment{}
 	seg.methods = map[string]http.HandlerFunc{}
 	seg.path = path
+
+	if isVariable(key) {
+		seg.variable = key[1:]
+	}
 
 	return
 }
@@ -178,6 +186,21 @@ func setupKeys(slice []string) (keys []string) {
 			keys = append(keys, "/"+v)
 		}
 	}
+
+	return
+}
+
+// isVariable returns true if the key is more than one character long and starts with a ':'
+func isVariable(key string) (isVar bool) {
+	if len(key) <= 1 {
+		return // avoid empty variables, i.e. /somepath/:/someotherpath
+	}
+
+	if key[0] != ':' {
+		return
+	}
+
+	isVar = true
 
 	return
 }
