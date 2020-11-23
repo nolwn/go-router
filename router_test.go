@@ -49,8 +49,8 @@ func TestServeHTTP(t *testing.T) {
 	defer testOutcome("can find correct callback function", t)
 
 	router := Router{}
-	path := "/items"
-	expectedBody := "I am /items"
+	path := "/items/things/stuff"
+	expectedBody := "I am /items/things/stuff"
 	expectedCode := 200
 
 	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +59,39 @@ func TestServeHTTP(t *testing.T) {
 	})
 
 	err := matchAndCheckRoute(&router, http.MethodGet, path, expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not find the expected callback handler", err)
+
+		return
+	}
+
+	path = "/"
+	expectedBody = "I am /"
+
+	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(expectedCode)
+		w.Write([]byte(expectedBody))
+	})
+
+	err = matchAndCheckRoute(&router, http.MethodGet, path, expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not find the expected callback handler", err)
+
+		return
+	}
+
+	path = "/items/:itemid/edit"
+	expectedBody = "I have a path param"
+	reqPath := "/items/this-is-an-id/edit"
+
+	router.AddRoute(http.MethodGet, path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(expectedCode)
+		w.Write([]byte(expectedBody))
+	})
+
+	err = matchAndCheckRoute(&router, http.MethodGet, reqPath, expectedBody, expectedCode)
 
 	if err != nil {
 		t.Error("Did not find the expected callback handler", err)
@@ -156,10 +189,14 @@ func testOutcome(message string, t *testing.T) {
 }
 
 // checkLookup prints out the various saved routes. It's not needed for any test, but is a helpful debugging tool.
-// func checkLookup(curr *segment) {
-// 	fmt.Printf("%p { path: %s, methods: %v, children: %v}\n", curr, curr.path, curr.methods, curr.children)
+func checkLookup(curr *segment) {
+	fmt.Printf("%p { path: \"%s\", methods: %v, children: %v, parameter: %v, parameterName: \"%s\"}\n", curr, curr.path, curr.methods, curr.children, curr.parameter, curr.parameterName)
 
-// 	for _, v := range curr.children {
-// 		checkLookup(v)
-// 	}
-// }
+	for _, v := range curr.children {
+		checkLookup(v)
+	}
+
+	if curr.parameter != nil {
+		checkLookup(curr.parameter)
+	}
+}

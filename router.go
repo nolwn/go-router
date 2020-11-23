@@ -30,10 +30,11 @@ type route struct {
 }
 
 type segment struct {
-	children map[string]*segment
-	methods  map[string]http.HandlerFunc
-	path     string
-	variable string
+	children      map[string]*segment
+	methods       map[string]http.HandlerFunc
+	path          string
+	parameter     *segment
+	parameterName string
 }
 
 // NotFoundHandler is the default function for handling routes that are not found. If you wish to
@@ -64,8 +65,7 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 		}
 
 		if child, ok := curr.children[key]; !ok {
-			seg := newSegment(curr.path, key)
-			curr.children[key] = seg
+			seg := addSegment(curr, key)
 			curr = seg
 		} else {
 			curr = child
@@ -114,11 +114,13 @@ func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
 			continue
 		}
 
-		if seg, ok := curr.children[v]; ok {
-			curr = seg
-		} else {
+		seg := getChild(v, curr)
+
+		if seg == nil {
 			return
 		}
+
+		curr = seg
 	}
 
 	if cb, ok := curr.methods[method]; ok {
@@ -142,21 +144,45 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	return
 }
 
-func addSegment(curr *segment, keys []string) (seg *segment) {
-	for _, key := range keys {
-		if child, ok := curr.children[key]; !ok {
-			seg = newSegment(curr.path, key)
-			curr.children[key] = seg
-			curr = seg
+func addSegment(curr *segment, key string) (seg *segment) {
+	if curr.parameterName == key {
+		seg = curr.parameter
+
+	} else if child, ok := curr.children[key]; !ok { // child does not match...
+		var isParam bool
+
+		seg, isParam = newSegment(curr.path, key)
+
+		if isParam {
+			curr.parameter = seg
+			curr.parameterName = key[2:]
+
 		} else {
-			curr = child
+			curr.children[key] = seg
 		}
+
+		return
+
+	} else { // child matches...
+		seg = child
 	}
 
 	return
 }
 
-func newSegment(parentPath string, key string) (seg *segment) {
+func getChild(key string, curr *segment) (child *segment) {
+	if seg, ok := curr.children[key]; ok { // is there an exact match?
+
+		child = seg
+	} else if curr.parameter != nil { // could this be a parameter?
+		child = curr.parameter
+
+	}
+
+	return
+}
+
+func newSegment(parentPath string, key string) (seg *segment, isParam bool) {
 	var path string
 
 	if parentPath == "/" {
@@ -172,8 +198,8 @@ func newSegment(parentPath string, key string) (seg *segment) {
 	seg.methods = map[string]http.HandlerFunc{}
 	seg.path = path
 
-	if isVariable(key) {
-		seg.variable = key[1:]
+	if isParameter(key) {
+		isParam = true
 	}
 
 	return
@@ -190,13 +216,13 @@ func setupKeys(slice []string) (keys []string) {
 	return
 }
 
-// isVariable returns true if the key is more than one character long and starts with a ':'
-func isVariable(key string) (isVar bool) {
-	if len(key) <= 1 {
+// isParameter returns true if the key is more than one character long and starts with a ':'
+func isParameter(key string) (isVar bool) {
+	if len([]rune(key)) <= 2 {
 		return // avoid empty variables, i.e. /somepath/:/someotherpath
 	}
 
-	if key[0] != ':' {
+	if key[1] != ':' {
 		return
 	}
 
