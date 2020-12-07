@@ -11,7 +11,7 @@ import (
 var testLevel = 1
 
 func TestAddRouter(t *testing.T) {
-	describeTests("Test AddRouter function")
+	describeTests("Test AddRouter method")
 
 	router := Router{}
 
@@ -22,13 +22,21 @@ func TestAddRouter(t *testing.T) {
 }
 
 func TestServeHTTP(t *testing.T) {
-	describeTests("Test ServeHTTP function")
+	describeTests("Test ServeHTTP method")
 
 	router := Router{}
 
 	testMatchesRoot(router, t)
 	testMatchesLongPath(router, t)
 	testMatchesPathParam(router, t)
+}
+
+func TestPathParams(t *testing.T) {
+	describeTests("Test PathParams method")
+
+	router := Router{}
+
+	testParamValues(router, t)
 }
 
 func addAndCheckRoute(r *Router, method string, path string, callback http.HandlerFunc) (err error) {
@@ -71,7 +79,7 @@ func addAndCheckRoute(r *Router, method string, path string, callback http.Handl
 
 // checkLookup prints out the various saved routes. It's not needed for any test, but is a helpful debugging tool.
 func checkLookup(curr *segment) {
-	fmt.Printf("%p { path: \"%s\", methods: %v, children: %v, parameter: %v, parameterName: \"%s\"}\n", curr, curr.path, curr.methods, curr.children, curr.parameter, curr.parameterName)
+	fmt.Printf("%p { methods: %v, children: %v, parameter: %v\"}\n", curr, curr.endpoints, curr.children, curr.parameter)
 
 	for _, v := range curr.children {
 		checkLookup(v)
@@ -218,6 +226,52 @@ func testMatchesRoot(router Router, t *testing.T) {
 	})
 
 	err := matchAndCheckRoute(&router, http.MethodGet, path, expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not find the expected callback handler", err)
+
+		return
+	}
+}
+
+func testParamValues(router Router, t *testing.T) {
+	defer testOutcome("returns param names and values", t)
+
+	method := http.MethodOptions
+	path := "/users/:userID/edit/:status"
+	userID := "46"
+	status := "inactive"
+	expectedBody := "done"
+	expectedStatus := 200
+	reqPath := fmt.Sprintf("/users/%s/edit/%s", userID, status)
+
+	router.AddRoute(method, path, func(w http.ResponseWriter, r *http.Request) {
+		requestPath := r.URL.Path
+		requestMethod := r.Method
+
+		params, err := router.PathParams(requestMethod, requestPath)
+
+		if err != nil {
+			t.Error("An error occurred while getting path parameters")
+		}
+
+		if len(params) != 2 {
+			t.Errorf("Received the wrong number of parameters. Expected 2, recieved %d", len(params))
+		}
+
+		if params["userID"] != userID {
+			t.Errorf("userID should be %s, but it is %s", userID, params["userID"])
+		}
+
+		if params["status"] != status {
+			t.Errorf("status should be %s, but it is %s", status, params["status"])
+		}
+
+		w.WriteHeader(expectedStatus)
+		w.Write([]byte(expectedBody))
+	})
+
+	err := matchAndCheckRoute(&router, method, reqPath, expectedBody, expectedStatus)
 
 	if err != nil {
 		t.Error("Did not find the expected callback handler", err)
