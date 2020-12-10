@@ -112,14 +112,6 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 	return
 }
 
-// PathParams takes a path and returns the values for any path parameters
-// in the path.
-func (r *Router) PathParams(req *http.Request) (params map[string]string) {
-	params = req.Context().Value(paramKey).(map[string]string)
-
-	return
-}
-
 // handler returns the handler to use for the given request, consulting r.Method, r.URL.Path. It
 // always returns a non-nil handler.
 //
@@ -157,6 +149,14 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	req = req.WithContext(ctx)
 
 	handler.ServeHTTP(w, req)
+
+	return
+}
+
+// PathParams takes a path and returns the values for any path parameters
+// in the path.
+func PathParams(req *http.Request) (params map[string]string) {
+	params = req.Context().Value(paramKey).(map[string]string)
 
 	return
 }
