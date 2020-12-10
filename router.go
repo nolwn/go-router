@@ -112,14 +112,14 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 	return
 }
 
-// handler returns the handler to use for the given request, consulting r.Method, r.URL.Path. It
-// always returns a non-nil handler.
+// Handler returns the Handler to use for the given request, consulting r.Method, r.URL.Path. It
+// always returns a non-nil Handler.
 //
-// handler also returns a new context which contains any path parameters that are needed.
+// Handler also returns a new context which contains any path parameters that are needed.
 //
-// If there is no registered handler that applies to the request, handler returns a ``page not
-// found'' handler and an empty pattern.
-func (r *Router) handler(req *http.Request) (h http.Handler, ctx context.Context) {
+// If there is no registered Handler that applies to the request, Handler returns a ``page not
+// found'' Handler and an empty pattern.
+func (r *Router) Handler(req *http.Request) (h http.Handler, ctx context.Context) {
 	method := req.Method
 	path := req.URL.Path
 
@@ -144,7 +144,7 @@ func (r *Router) handler(req *http.Request) (h http.Handler, ctx context.Context
 // In the case of this router, all it needs to do is lookup the Handler that has been saved at a given
 // path and then call its ServeHTTP.
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	handler, ctx := r.handler(req)
+	handler, ctx := r.Handler(req)
 
 	req = req.WithContext(ctx)
 
