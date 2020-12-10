@@ -85,8 +85,8 @@ func checkLookup(curr *segment) {
 		checkLookup(v)
 	}
 
-	if curr.parameter != nil {
-		checkLookup(curr.parameter)
+	if curr.parameter.segment != nil {
+		checkLookup(curr.parameter.segment)
 	}
 }
 
@@ -246,14 +246,7 @@ func testParamValues(router Router, t *testing.T) {
 	reqPath := fmt.Sprintf("/users/%s/edit/%s", userID, status)
 
 	router.AddRoute(method, path, func(w http.ResponseWriter, r *http.Request) {
-		requestPath := r.URL.Path
-		requestMethod := r.Method
-
-		params, err := router.PathParams(requestMethod, requestPath)
-
-		if err != nil {
-			t.Error("An error occurred while getting path parameters")
-		}
+		params := router.PathParams(r)
 
 		if len(params) != 2 {
 			t.Errorf("Received the wrong number of parameters. Expected 2, recieved %d", len(params))
