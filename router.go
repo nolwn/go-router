@@ -143,7 +143,7 @@ func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
 //
 // In the case of this router, all it needs to do is lookup the Handler that has been saved at a given
 // path and then call its ServeHTTP.
-func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	method := req.Method
 	path := req.URL.Path
 	var handler http.Handler
