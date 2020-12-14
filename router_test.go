@@ -246,7 +246,7 @@ func testParamValues(router Router, t *testing.T) {
 	reqPath := fmt.Sprintf("/users/%s/edit/%s", userID, status)
 
 	router.AddRoute(method, path, func(w http.ResponseWriter, r *http.Request) {
-		params := router.PathParams(r)
+		params := PathParams(r)
 
 		if len(params) != 2 {
 			t.Errorf("Received the wrong number of parameters. Expected 2, recieved %d", len(params))
