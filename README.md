@@ -14,7 +14,7 @@ Inside the handler function you provide, access path parameters with the `PathPa
 
 ```go
 router.AddRoute(http.MethodGet, "user/:userID", func(w http.ResponseWriter, r *http.Request) {
-    params, _ := router.PathParams(requestMethod, requestPath)
+    params, _ := PathParams(r)
     
     userID := params["userID"]
 })
@@ -23,3 +23,7 @@ router.AddRoute(http.MethodGet, "user/:userID", func(w http.ResponseWriter, r *h
 ## Not Found Handler
 
 If Router.NotFoundHandler is not a set, a default handler will be called when a route is not found. If you want to set your own handler, set Router.NotFoundHandler with the http.Handler you would prefer.
+
+## Public consumption
+
+I have included a license but this really isn't for public consumption. If you have found this repository somehow and you want to use it, understand that you are on your own in terms of getting it working, fixing issues, adding features, etc. Use at your own risk.

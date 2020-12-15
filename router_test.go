@@ -18,7 +18,7 @@ func TestAddRouter(t *testing.T) {
 	testAddRoot(router, t)
 	testAddOneSegment(router, t)
 	testAddManySegments(router, t)
-	// TODO: add test for error when trying duplicate method + path
+	testAddDuplicateEndpoint(router, t)
 }
 
 func TestServeHTTP(t *testing.T) {
@@ -29,6 +29,8 @@ func TestServeHTTP(t *testing.T) {
 	testMatchesRoot(router, t)
 	testMatchesLongPath(router, t)
 	testMatchesPathParam(router, t)
+	testDefaultNotFound(router, t)
+	testCustomNotFound(router, t)
 }
 
 func TestPathParams(t *testing.T) {
@@ -108,7 +110,7 @@ func matchAndCheckRoute(r *Router, method string, path string, expectedBody stri
 	r.ServeHTTP(rr, request)
 
 	if rr.Code != expectedCode {
-		err = fmt.Errorf("The returned callback did not write 200 to the header. Found %d", rr.Code)
+		err = fmt.Errorf("The returned callback did not write %d to the header. Found %d", expectedCode, rr.Code)
 
 		return
 	}
@@ -126,6 +128,28 @@ func matchAndCheckRoute(r *Router, method string, path string, expectedBody stri
 	}
 
 	return
+}
+
+func testAddDuplicateEndpoint(router Router, t *testing.T) {
+	defer testOutcome("add duplicate endpoints", t)
+
+	err := addAndCheckRoute(&router, http.MethodGet, "/dupe", func(http.ResponseWriter, *http.Request) {})
+
+	if err != nil {
+		t.Error("The route was not correctly added to the routoer", err)
+	}
+
+	err = addAndCheckRoute(&router, http.MethodPost, "/dupe", func(http.ResponseWriter, *http.Request) {})
+
+	if err != nil {
+		t.Error("The route was not correctly added to the routoer", err)
+	}
+
+	err = addAndCheckRoute(&router, http.MethodGet, "/dupe", func(http.ResponseWriter, *http.Request) {})
+
+	if err == nil {
+		t.Error("Adding a duplicate route should throw an error.")
+	}
 }
 
 func testAddManySegments(router Router, t *testing.T) {
@@ -167,6 +191,53 @@ func testAddRoot(router Router, t *testing.T) {
 
 	if err != nil {
 		t.Error("The route was not correctly added to the router: ", err)
+	}
+}
+
+func testCustomNotFound(router Router, t *testing.T) {
+	defer testOutcome("custom NotFoundHandler", t)
+
+	expectedBody := "Forbidden"
+	expectedCode := 401
+	path := "/actual/path"
+
+	router.AddRoute(http.MethodPatch, path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+		w.Write([]byte("Not found."))
+	})
+
+	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(expectedCode)
+		w.Write([]byte(expectedBody))
+	})
+
+	err := matchAndCheckRoute(&router, http.MethodPatch, "/gibberish/forbidden", expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not call the custom handler.", err)
+
+		return
+	}
+}
+
+func testDefaultNotFound(router Router, t *testing.T) {
+	defer testOutcome("default NotFoundHandler", t)
+
+	expectedBody := "Not Found."
+	expectedCode := 404
+	path := "/gibberish"
+
+	router.AddRoute(http.MethodDelete, path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(expectedCode)
+		w.Write([]byte(expectedBody))
+	})
+
+	err := matchAndCheckRoute(&router, http.MethodDelete, "/gibberish", expectedBody, expectedCode)
+
+	if err != nil {
+		t.Error("Did not find the expected callback handler", err)
+
+		return
 	}
 }
 

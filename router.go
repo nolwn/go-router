@@ -112,31 +112,6 @@ func (r *Router) AddRoute(method string, path string, callback http.HandlerFunc)
 	return
 }
 
-// Handler returns the Handler to use for the given request, consulting r.Method, r.URL.Path. It
-// always returns a non-nil Handler.
-//
-// Handler also returns the path which it matched.
-//
-// If there is no registered Handler that applies to the request, Handler returns a ``page not
-// found'' Handler and an empty pattern.
-func (r *Router) Handler(req *http.Request) (h http.Handler, pattern string) {
-	method := req.Method
-	path := req.URL.Path
-
-	if r.NotFoundHandler == nil {
-		h = NotFoundHandler
-	}
-
-	endpoint, _, err := r.getEndpoint(method, path)
-
-	if err == nil {
-		h = endpoint.callback
-		pattern = endpoint.path
-	}
-
-	return
-}
-
 // ServeHTTP is the function that is required by http.Handler. It takes an http.ResponseWriter which
 // it uses to write to a response object that will construct a response for the user. It also takes
 // an *http.Request which describes the request the user has made.
@@ -151,14 +126,12 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	endpoint, params, err := r.getEndpoint(method, path)
 
 	if err != nil {
-		handler = NotFoundHandler
+		handler = r.NotFoundHandler
 	} else {
 		handler = endpoint.callback
 		ctx := context.WithValue(context.Background(), paramsKey, params)
 		req = req.WithContext(ctx)
 	}
-
-	handler, _ = r.Handler(req)
 
 	handler.ServeHTTP(w, req)
 
@@ -233,6 +206,8 @@ func (r *Router) getEndpoint(method string, path string) (end *endpoint, params 
 		seg, paramName := getChild(key, curr)
 
 		if seg == nil {
+			err = errors.New("route not found")
+
 			return
 		}
 
