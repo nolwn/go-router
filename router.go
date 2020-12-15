@@ -126,7 +126,11 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	endpoint, params, err := r.getEndpoint(method, path)
 
 	if err != nil {
-		handler = r.NotFoundHandler
+		if r.NotFoundHandler != nil {
+			handler = r.NotFoundHandler
+		} else {
+			handler = NotFoundHandler
+		}
 	} else {
 		handler = endpoint.callback
 		ctx := context.WithValue(context.Background(), paramsKey, params)
@@ -179,7 +183,10 @@ func addSegment(curr *segment, key string) (seg *segment) {
 // is returned. If there is no parameter child, nil is returned. isParam is true if the parameter child is
 // being returned.
 func getChild(key string, curr *segment) (child *segment, param string) {
-	if seg, ok := curr.children[key]; ok { // is there an exact match?
+	if curr == nil {
+		return
+
+	} else if seg, ok := curr.children[key]; ok { // is there an exact match?
 		child = seg
 
 	} else if curr.parameter.segment != nil { // could this be a parameter?
@@ -207,7 +214,6 @@ func (r *Router) getEndpoint(method string, path string) (end *endpoint, params 
 
 		if seg == nil {
 			err = errors.New("route not found")
-
 			return
 		}
 

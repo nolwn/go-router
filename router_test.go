@@ -199,19 +199,14 @@ func testCustomNotFound(router Router, t *testing.T) {
 
 	expectedBody := "Forbidden"
 	expectedCode := 401
-	path := "/actual/path"
-
-	router.AddRoute(http.MethodPatch, path, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(404)
-		w.Write([]byte("Not found."))
-	})
+	path := "/gibberish/forbidden"
 
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(expectedCode)
 		w.Write([]byte(expectedBody))
 	})
 
-	err := matchAndCheckRoute(&router, http.MethodPatch, "/gibberish/forbidden", expectedBody, expectedCode)
+	err := matchAndCheckRoute(&router, http.MethodPatch, path, expectedBody, expectedCode)
 
 	if err != nil {
 		t.Error("Did not call the custom handler.", err)
@@ -227,12 +222,7 @@ func testDefaultNotFound(router Router, t *testing.T) {
 	expectedCode := 404
 	path := "/gibberish"
 
-	router.AddRoute(http.MethodDelete, path, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(expectedCode)
-		w.Write([]byte(expectedBody))
-	})
-
-	err := matchAndCheckRoute(&router, http.MethodDelete, "/gibberish", expectedBody, expectedCode)
+	err := matchAndCheckRoute(&router, http.MethodDelete, path, expectedBody, expectedCode)
 
 	if err != nil {
 		t.Error("Did not find the expected callback handler", err)
