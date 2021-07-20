@@ -344,6 +344,4 @@ func testOutcome(message string, t *testing.T) {
 	}
 
 	fmt.Printf("\t%s %s\n", status, message)
-
-	return
 }

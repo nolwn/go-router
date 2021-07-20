@@ -1,3 +1,3 @@
-module github.com/jr-dev-league/go-router
+module github.com/nolwn/go-router
 
 go 1.15

@@ -138,8 +138,6 @@ func (r Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	handler.ServeHTTP(w, req)
-
-	return
 }
 
 // PathParams takes a path and returns the values for any path parameters
